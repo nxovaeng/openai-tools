@@ -23,8 +23,9 @@ class InstallResponse(BaseModel):
 class DeployRequest(BaseModel):
     """Deployment request schema."""
     domains: list[str] = Field(..., description="域名列表，例如 ['proxy1.example.com', 'proxy2.example.com']")
-    xray_path: str = Field("/xray", description="XHTTP URL 路径")
+    xray_path: Optional[str] = Field(None, description="XHTTP URL 路径，如不指定会自动生成随机路径")
     xray_port: int = Field(10000, description="Xray 本地监听端口")
+    cdn_host: Optional[str] = Field(None, description="CDN 反代地址，用于 CNAME 指向")
 
 
 class DeployResponse(BaseModel):

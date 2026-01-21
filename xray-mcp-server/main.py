@@ -30,13 +30,13 @@ from installer import Installer
 from config_generator import ConfigGenerator
 from subscription import subscription_service
 
-# Initialize FastAPI app
+# Initialize FastAPI app - disable docs/redoc for security
 app = FastAPI(
     title="Xray Deployment API",
     description="Automated Xray + Caddy deployment with XHTTP protocol support",
     version="1.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc"
+    docs_url=None,  # Disabled for security
+    redoc_url=None  # Disabled for security
 )
 
 # CORS middleware
@@ -130,15 +130,17 @@ async def deploy(
     _current_config = ConfigGenerator(
         domains=request.domains,
         xray_port=request.xray_port,
-        xray_path=request.xray_path
+        xray_path=request.xray_path,
+        cdn_host=request.cdn_host
     )
     
-    # Update subscription service
+    # Update subscription service - CDN host for subscription output
     subscription_service.update_config(
         uuid=_current_config.client_uuid,
         domains=request.domains,
-        path=request.xray_path,
-        port=443
+        path=_current_config.xray_path,
+        port=443,
+        cdn_host=request.cdn_host
     )
     
     # Try to deploy (may fail if not root or in Docker)
@@ -155,27 +157,34 @@ async def deploy(
         config_dir.mkdir(parents=True, exist_ok=True)
         
         (config_dir / "xray-config.json").write_text(_current_config.generate_xray_json())
-        (config_dir / "Caddyfile").write_text(_current_config.generate_caddyfile())
+        (config_dir / "Caddyfile").write_text(_current_config.generate_main_caddyfile())
+        (config_dir / "xray-auto.caddy").write_text(_current_config.generate_caddyfile())
         
         deployment_status = {
             "mode": "config_only",
             "note": "Configs generated in /app/generated_configs. Deploy manually or use host-mode.",
             "xray_config": str(config_dir / "xray-config.json"),
-            "caddyfile": str(config_dir / "Caddyfile")
+            "caddy_main": str(config_dir / "Caddyfile"),
+            "caddy_xray_auto": str(config_dir / "xray-auto.caddy")
+        }
         }
     elif deployment_mode == "container":
         # All-in-one container mode: deploy and restart via supervisord
         import subprocess
         
-        xray_path = Path("/etc/xray/config.json")
-        caddy_path = Path("/etc/caddy/Caddyfile")
+        # Use environment-specified paths or defaults
+        xray_path = Path(os.getenv("XRAY_CONFIG_PATH", "/app/data/xray/config.json"))
+        caddy_main_path = Path(os.getenv("CADDY_CONFIG_PATH", "/app/data/caddy/Caddyfile"))
+        caddy_conf_d_path = Path(os.getenv("CADDY_CONF_D_PATH", "/app/data/caddy/conf.d/xray-auto.caddy"))
         
         xray_path.parent.mkdir(parents=True, exist_ok=True)
-        caddy_path.parent.mkdir(parents=True, exist_ok=True)
+        caddy_main_path.parent.mkdir(parents=True, exist_ok=True)
+        caddy_conf_d_path.parent.mkdir(parents=True, exist_ok=True)
         
-        # Save configs
+        # Save configs with proper structure
         xray_path.write_text(_current_config.generate_xray_json())
-        caddy_path.write_text(_current_config.generate_caddyfile())
+        caddy_main_path.write_text(_current_config.generate_main_caddyfile())
+        caddy_conf_d_path.write_text(_current_config.generate_caddyfile())
         
         # Restart services via supervisorctl
         xray_restart = subprocess.run(
@@ -197,7 +206,8 @@ async def deploy(
                 "message": xray_restart.stdout if xray_restart.returncode == 0 else xray_restart.stderr
             },
             "caddy": {
-                "config_saved": str(caddy_path),
+                "main_config": str(caddy_main_path),
+                "xray_auto_config": str(caddy_conf_d_path),
                 "restart_success": caddy_restart.returncode == 0,
                 "message": caddy_restart.stdout if caddy_restart.returncode == 0 else caddy_restart.stderr
             },
@@ -211,8 +221,11 @@ async def deploy(
         import subprocess
         from pathlib import Path
         
-        # Save configs
-        xray_path = Path("/usr/local/etc/xray/config.json")
+        # Save configs with environment-aware paths
+        deployment_mode = os.getenv("DEPLOYMENT_MODE", "full")
+        is_docker = deployment_mode == "container"
+        
+        xray_path = Path("/etc/xray/config.json") if is_docker else Path("/usr/local/etc/xray/config.json")
         
         # Use snippet file to avoid overwriting existing Caddyfile
         caddy_snippet_dir = Path("/etc/caddy/conf.d")

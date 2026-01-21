@@ -1,16 +1,51 @@
 FROM python:3.11-slim
 
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    supervisor \
+    debian-keyring \
+    debian-archive-keyring \
+    apt-transport-https \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Caddy
+RUN curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg && \
+    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list && \
+    apt-get update && \
+    apt-get install -y caddy && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install Xray
+RUN curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh | bash -s -- install
+
+# Set working directory
 WORKDIR /app
 
-# Install dependencies
+# Copy Python requirements and install
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application files
 COPY . .
 
-# Expose API port
-EXPOSE 8000
+# Create data directories and symlinks for easy access
+RUN mkdir -p /app/data/xray \
+             /app/data/caddy/conf.d \
+             /app/data/logs && \
+    # Create symlinks for compatibility with standard paths
+    mkdir -p /etc/caddy/conf.d && \
+    mkdir -p /var/log/supervisor
 
-# Run FastAPI server
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Copy supervisord configuration
+COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+# Expose ports
+EXPOSE 8000 443 80
+
+# Set environment variable for container mode
+ENV DEPLOYMENT_MODE=container \
+    XRAY_CONFIG_PATH=/app/data/xray/config.json \
+    CADDY_CONFIG_PATH=/app/data/caddy/Caddyfile \
+    CADDY_CONF_D_PATH=/app/data/caddy/conf.d/xray-auto.caddy

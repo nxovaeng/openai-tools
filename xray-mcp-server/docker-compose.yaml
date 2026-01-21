@@ -1,51 +1,17 @@
-version: '3.8'
-
 services:
-  # Option 1: API-only mode (just generate configs, don't deploy)
-  xray-api:
-    build: .
-    container_name: xray-deployment-api
-    ports:
-      - "8000:8000"
+  xray-allinone:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: xray-allinone
+    network_mode: host  # Use host network for easy integration with other services
     volumes:
-      - ./configs:/app/generated_configs # Save generated configs here
       - ./.env:/app/.env # API key
+      - ./data:/app/data # Persistent data directory (configs, logs, etc)
     restart: unless-stopped
     environment:
       - TZ=Asia/Shanghai
-      - DEPLOYMENT_MODE=config_only # Only generate, don't deploy
-    networks:
-      - xray-net
-  # Option 2: Full stack (API + Xray + Caddy in Docker)
-  # Uncomment below if you want everything in Docker
-
-  # xray:
-  #   image: teddysun/xray:latest
-  #   container_name: xray-server
-  #   volumes:
-  #     - ./configs/xray:/etc/xray
-  #   restart: unless-stopped
-  #   networks:
-  #     - xray-net
-
-  # caddy:
-  #   image: caddy:2-alpine
-  #   container_name: caddy-server
-  #   ports:
-  #     - "443:443"
-  #     - "80:80"
-  #   volumes:
-  #     - ./configs/caddy/Caddyfile:/etc/caddy/Caddyfile
-  #     - caddy_data:/data
-  #     - caddy_config:/config
-  #   restart: unless-stopped
-  #   networks:
-  #     - xray-net
-
-networks:
-  xray-net:
-    driver: bridge
-
-volumes:
-  caddy_data:
-  caddy_config:
+      - DEPLOYMENT_MODE=container
+      - XRAY_CONFIG_PATH=/app/data/xray/config.json
+      - CADDY_CONFIG_PATH=/app/data/caddy/Caddyfile
+      - CADDY_CONF_D_PATH=/app/data/caddy/conf.d

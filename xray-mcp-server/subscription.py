@@ -35,6 +35,8 @@ class VlessNode:
             f"type={self.network}",
             f"security={self.security}",
             f"path={quote(self.path, safe='')}",
+            "fp=chrome",
+            "alpn=h2",
         ]
         
         if self.sni:
@@ -54,19 +56,23 @@ class SubscriptionGenerator:
         uuid: str,
         domains: list[str],
         port: int = 443,
-        path: str = "/xray"
+        path: str = "/xray",
+        cdn_host: Optional[str] = None
     ):
         self.uuid = uuid
         self.domains = domains
         self.port = port
         self.path = path
+        self.cdn_host = cdn_host
         
+        # Create nodes: each domain gets own SNI for routing, CDN host for subscription
         self._nodes = [
             VlessNode(
                 uuid=uuid,
-                domain=domain,
+                domain=cdn_host or domain,  # Use CDN host in subscription if available
                 port=port,
-                path=path
+                path=path,
+                sni=domain  # SNI is domain itself for Caddy routing
             )
             for domain in domains
         ]
@@ -106,14 +112,17 @@ class SubscriptionService:
         uuid: str,
         domains: list[str],
         port: int = 443,
-        path: str = "/xray"
+        path: str = "/xray",
+        cdn_host: Optional[str] = None
     ):
         """Update subscription configuration."""
+        # Create generator - CDN host for subscription output, domain for SNI
         self._generator = SubscriptionGenerator(
             uuid=uuid,
             domains=domains,
             port=port,
-            path=path
+            path=path,
+            cdn_host=cdn_host
         )
     
     def get_subscription(self, format: str = "base64") -> Optional[str]:

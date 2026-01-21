@@ -12,3 +12,10 @@ build/
 .pytest_cache/
 .coverage
 htmlcov/
+# Persistent data directory (never commit, local development only)
+data/
+*.log
+*.swp
+*.swo
+*~
+.DS_Store

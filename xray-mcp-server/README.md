@@ -1,73 +1,30 @@
-# Xray Deployment API
+# Xray Deployment MCP Server
 
-**OpenAPI-compatible** tool server for automated Xray + Caddy deployment with XHTTP protocol.
+**MCP 工具服务器**用于自动化 Xray + Caddy 部署，支持 XHTTP 协议。
 
-## Features
+## 特性
 
-- ✅ **One-click deployment** via REST API
-- ✅ **XHTTP protocol** (packet-up mode, maximum compatibility)
-- ✅ **Automatic configuration** generation for Xray + Caddy
-- ✅ **Subscription links** (Base64 VLESS URI)
-- ✅ **Natural language interaction** via Open WebUI
-- ✅ **Docker support** for easy deployment
+- ✅ **MCP 工具集成** - 与 Open WebUI、Dify 等 AI 平台无缝集成
+- ✅ **XHTTP 协议** (packet-up 模式，最大兼容性)
+- ✅ **自动配置生成** - 为 Xray + Caddy 生成配置
+- ✅ **订阅链接** - 生成 Base64 编码的 VLESS URI
+- ✅ **SNI 和 CDN 支持** - 支持自定义 SNI 和 CDN 反代地址
+- ✅ **Docker 完整部署** - 一键容器化部署
 
 ---
 
-## Quick Start
+## 快速启动
 
-### Step 0: Configure API Key (Important!)
-
-首次启动时，服务器会自动生成 API Key 并保存到 `.env` 文件。
-
-**手动设置 API Key** (可选):
-```bash
-cd xray-mcp-server
-echo "API_KEY=your-secret-key-here" > .env
-```
-
-> ⚠️ **安全提示**: 请妥善保管 API Key，不要泄露！
-
-**快速启动（推荐）：**
-```bash
-./start.sh  # 自动创建 venv 并启动服务
-```
-
-### Option 1: Virtual Environment (推荐)
-
-**适用于 Debian/Ubuntu 等启用了 PEP 668 保护的系统**
+### 方式一：MCP Server (推荐用于 AI 集成)
 
 ```bash
 cd xray-mcp-server
-
-# 创建虚拟环境
-python3 -m venv venv
-
-# 激活虚拟环境
-source venv/bin/activate
-
-# 安装依赖
-pip install -r requirements.txt
-
-# 运行服务器
-uvicorn main:app --host 0.0.0.0 --port 8000
+./start.sh  # 自动创建 venv 并启动 MCP 服务
 ```
 
-**后续启动：**
-```bash
-cd xray-mcp-server
-source venv/bin/activate
-uvicorn main:app --host 0.0.0.0 --port 8000
-```
+MCP 服务器启动后，可集成到 Open WebUI 或 Dify 等平台。
 
-### Option 2: System-wide (需要 root)
-
-```bash
-cd xray-mcp-server
-sudo pip3 install -r requirements.txt --break-system-packages
-uvicorn main:app --host 0.0.0.0 --port 8000
-```
-
-### Option 3: Docker All-in-One (推荐容器化)
+### 方式二：Docker All-in-One (推荐生产环境)
 
 **完整的容器化方案**：API + Xray + Caddy 都在容器中，自动部署和重启。
 
@@ -78,286 +35,323 @@ docker compose -f docker-compose.allinone.yaml up -d
 
 **功能：**
 - ✅ 完全自动化部署
-- ✅ API 可以自动重启 Xray/Caddy
+- ✅ API 可以自动重启 Xray/Caddy  
 - ✅ supervisord 管理进程
 - ✅ 配置持久化
 
-详细文档：[docker/README.md](file:///home/yimeng/tools/xray-mcp-server/docker/README.md)
+详细文档：[docker/README.md](./docker/README.md)
 
-### Option 4: Docker (仅配置) (仅生成配置)
-
-**重要说明**: Docker 模式仅会生成配置文件，不会实际部署  Xray/Caddy 服务。
+### 方式三：systemd 服务 (生产部署)
 
 ```bash
+# 创建虚拟环境
 cd xray-mcp-server
-docker compose up -d
-```
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
 
-**使用流程：**
-1. API 生成配置文件到 `./configs/` 目录
-2. 手动将配置复制到系统目录：
-   ```bash
-   sudo cp configs/xray-config.json /usr/local/etc/xray/config.json
-   sudo cp configs/Caddyfile /etc/caddy/conf.d/xray-auto.caddy
-   sudo systemctl restart xray
-   sudo systemctl reload caddy
-   ```
-
-**为什么不能自动部署？**
-- Docker 容器无法安装宿主机软件
-- 容器内 `systemctl` 无法控制宿主机服务
-
-> 如需完全自动部署，请使用 **Option 1 (虚拟环境)** 或 **Option 4 (systemd)**
-
-### Option 4: Production (systemd + venv)
-
-```bash
-# Create service file
-sudo tee /etc/systemd/system/xray-api.service > /dev/null << 'EOF'
+# 创建 systemd 服务文件
+sudo tee /etc/systemd/system/xray-mcp.service > /dev/null << 'EOF'
 [Unit]
-Description=Xray Deployment API
+Description=Xray Deployment MCP Server
 After=network.target
 
 [Service]
 Type=simple
 User=root
 WorkingDirectory=/path/to/xray-mcp-server
-ExecStart=/path/to/xray-mcp-server/venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000
+ExecStart=/path/to/xray-mcp-server/venv/bin/python server.py
 Restart=always
+RestartSec=10
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
+# 启动服务
 sudo systemctl daemon-reload
-sudo systemctl enable xray-api
-sudo systemctl start xray-api
+sudo systemctl enable xray-mcp
+sudo systemctl start xray-mcp
 ```
 
 ---
 
-## API Endpoints
+## MCP 工具
 
-访问 **OpenAPI 文档**: `http://your-server:8000/docs`
+通过 MCP 接口可用的工具：
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/health` | Health check |
-| GET | `/environment` | Check Caddy/Xray installation status |
-| POST | `/install` | Install dependencies |
-| POST | `/deploy` | Deploy Xray + Caddy (one-click) |
-| GET | `/subscription` | Get subscription link |
-| GET | `/status` | Service status |
-
----
-
-## Usage Examples
-
-**所有受保护的 API 都需要在请求头中包含 X-API-Key！**
-
-### 0. 获取 API Key
-
-```bash
-cat .env
-# API_KEY=iKt-qkjps0oP3-jewhv6V-CQGOx9nhry1ODkjOXii48
-```
-
-### 1. Check Environment (无需认证)
-
-```bash
-curl http://localhost:8000/environment
-```
-
-### 2. One-Click Deploy (需要认证)
-
-```bash
-curl -X POST http://localhost:8000/deploy \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: your-api-key-here" \
-  -d '{
-    "domains": ["proxy.example.com"],
-    "xray_path": "/xray",
-    "xray_port": 10000
-  }'
-```
-
-Returns:
-```json
-{
-  "success": true,
-  "uuid": "a1b2c3d4-...",
-  "domains": ["proxy.example.com"],
-  "xray_config": {...},
-  "caddyfile": "...",
-  "deployment_status": {...}
-}
-```
-
-### 3. Get Subscription
-
-```bash
-curl http://localhost:8000/subscription?format=base64
-```
-
-Returns:
-```json
-{
-  "format": "base64",
-  "subscription": "dmxlc3M6Ly8uLi4=",
-  "nodes": [...]
-}
-```
+| 工具 | 描述 |
+|------|------|
+| `check_environment` | 检查 Caddy/Xray 安装状态 |
+| `install_dependencies` | 安装缺失的依赖 |
+| `generate_configs` | 生成 Xray 和 Caddy 配置 |
+| `deploy_configs` | 部署配置到系统路径 |
+| `get_subscription` | 获取订阅链接 |
+| `restart_services` | 重启 Xray/Caddy 服务 |
 
 ---
 
-## Open WebUI Integration
+## 使用示例
 
-### Step 1: Deploy API Server
+## 使用示例
 
-```bash
-# VPS 上运行
-uvicorn main:app --host 0.0.0.0 --port 8000
-```
+### 在 Open WebUI 中集成
 
-### Step 2: Add to Open WebUI
+1. 获取 MCP 服务器地址（例如 `http://your-vps-ip:5000`）
+2. 在 Open WebUI 的工具设置中添加该服务器
+3. 在对话中直接使用 AI 生成和部署配置
 
-在 Open WebUI 设置中添加工具服务器：
-
-```
-URL: http://your-vps-ip:8000
-```
-
-### Step 3: Natural Language Interaction
+### 场景 1: 单个域名部署
 
 ```
-User: 帮我部署一个代理，域名是 proxy.example.com
-AI:   好的，我来帮你部署...
-      [调用 /deploy 接口]
-      已成功部署！订阅链接：vmxlc3M6Ly8...
+User: 部署一个代理，域名 proxy1.example.com
+AI:   
+  generate_configs(
+    domains=["proxy1.example.com"],
+    # xray_path 自动生成 (e.g., /a7kRmQ2xJ9vN4pL)
+  )
+  
+  生成结果：
+  - Xray: VLESS 入站，SNI = proxy1.example.com
+  - Caddy: proxy1.example.com 虚拟主机反代
+  - 订阅: vless://uuid@proxy1.example.com:443?...&sni=proxy1.example.com
 ```
+
+### 场景 2: 多个域名多入口
+
+```
+User: 我有多个域名 proxy1.example.com 和 proxy2.example.com，生成多个入口
+AI:
+  generate_configs(
+    domains=["proxy1.example.com", "proxy2.example.com"]
+  )
+  
+  生成结果：
+  - Xray: VLESS 入站（支持多 domain）
+  - Caddy: 生成两个虚拟主机
+    * proxy1.example.com -> SNI 路由到 proxy1.example.com
+    * proxy2.example.com -> SNI 路由到 proxy2.example.com
+  - 订阅: 
+    * vless://uuid@proxy1.example.com:443?...&sni=proxy1.example.com
+    * vless://uuid@proxy2.example.com:443?...&sni=proxy2.example.com
+```
+
+### 场景 3: 使用 CDN 反代域名
+
+```
+User: 域名是 proxy.example.com，但我想通过 CDN 反代域名 cdn.example.com 访问
+AI:
+  generate_configs(
+    domains=["proxy.example.com"],
+    cdn_host="cdn.example.com"
+  )
+  
+  生成结果：
+  - Caddy: proxy.example.com 虚拟主机 (SNI 路由)
+  - 订阅: vless://uuid@cdn.example.com:443?...&sni=proxy.example.com
+    * 客户端连接到 cdn.example.com
+    * SNI 发送 proxy.example.com 用于 Caddy 路由
+```
+
+### 参数说明
+
+| 参数 | 说明 | 示例 |
+|------|------|------|
+| `domains` | 必需，Caddy 虚拟主机列表，每个 domain 各自的 SNI | `["proxy1.com", "proxy2.com"]` |
+| `xray_path` | 可选，XHTTP 路径，不指定自动生成随机 | `/secret-path` 或省略 |
+| `xray_port` | 可选，Xray 监听端口，默认 10000 | `10000` |
+| `cdn_host` | 可选，CDN 反代域名，替换订阅中的 domain | `cdn.example.com` |
 
 ---
 
-## Configuration Management
+## 配置管理
 
-### 不会覆盖现有配置！
+### Caddy 分路径配置
 
-本工具采用 **配置片段 (snippet)** 方式部署，**不会覆盖**您手动添加的 Caddy 配置。
+系统采用**模块化分路径配置**，支持灵活扩展：
 
-**工作原理：**
-
-1. Xray 配置写入：`/etc/caddy/conf.d/xray-auto.caddy`
-2. 主配置文件自动添加 import 指令：`import /etc/caddy/conf.d/*.caddy`
-3. 您的其他配置保持不变
-
-**文件结构：**
+**目录结构**：
 ```
 /etc/caddy/
-├── Caddyfile         # 您的主配置（不会被覆盖）
+├── Caddyfile              # 主配置文件（import 管理）
 └── conf.d/
-    └── xray-auto.caddy  # 自动生成的 Xray 配置
+    ├── xray-auto.caddy    # 自动生成的 Xray 反代配置
+    └── custom-*.caddy     # 用户自定义配置（可选）
 ```
 
-**手动管理：**
-- 编辑其他配置：直接修改 `/etc/caddy/Caddyfile`
-- 查看 Xray 配置：`cat /etc/caddy/conf.d/xray-auto.caddy`
-- 删除 Xray 配置：`rm /etc/caddy/conf.d/xray-auto.caddy && systemctl reload caddy`
-
----
-
-## Configuration
-
-生成的 Xray 配置示例：
-
-```json
-{
-  "inbounds": [{
-    "protocol": "vless",
-    "settings": {
-      "clients": [{"id": "uuid", "flow": ""}]
-    },
-    "streamSettings": {
-      "network": "xhttp",
-      "xhttpSettings": {"path": "/xray", "mode": "packet-up"}
-    }
-  }]
-}
-```
-
-生成的 Caddyfile 示例：
-
+**主 Caddyfile 示例**：
 ```caddyfile
-proxy.example.com {
-    reverse_proxy /xray 127.0.0.1:10000 {
+{
+    admin off
+}
+
+# 自动包含所有子配置
+import /etc/caddy/conf.d/*.caddy
+```
+
+**自动生成的 xray-auto.caddy**：
+```caddyfile
+proxy1.example.com {
+    @xhttp path /a7kRmQ2xJ9vN4pL*
+    reverse_proxy @xhttp 127.0.0.1:10000 {
         flush_interval -1
     }
     respond "Welcome" 200
 }
 ```
 
----
+### 添加其他服务代理
 
-## Architecture
-
-```
-Open WebUI → HTTP → FastAPI → Config Generator → Deploy
-                                      ↓
-                              Xray + Caddy Configs
-                                      ↓
-                              systemctl restart
-```
-
----
-
-## Security
-
-### Reverse Proxy (推荐)
-
-使用 Caddy 反向代理并添加认证：
+无需修改自动生成的配置，直接在主 Caddyfile 或新建 `conf.d/custom-services.caddy`：
 
 ```caddyfile
-api.yourdomain.com {
-    reverse_proxy localhost:8000
-    
-    basicauth {
-        admin $2a$14$...  # bcrypt hash
-    }
+# Open WebUI
+open-webui.example.com {
+    reverse_proxy localhost:8111
+}
+
+# 其他服务
+api.example.com {
+    reverse_proxy localhost:3000
 }
 ```
 
-### Firewall
-
+**重启 Caddy 使配置生效**：
 ```bash
-# 只允许特定 IP 访问
-sudo ufw allow from YOUR_IP to any port 8000
+supervisorctl restart caddy
+# 或
+sudo systemctl reload caddy
+```
+
+### Docker Host 网络模式
+
+Docker Compose 采用 `host` 网络模式优势：
+
+- ✅ 无需端口映射，容器直接使用宿主机端口
+- ✅ 方便添加其他服务（Open WebUI 等）
+- ✅ 性能更优，避免 NAT 开销
+- ✅ 便于调试，直接访问 localhost
+
+**特别适用于**：
+```
+同服务器部署多个应用：
+├── Xray (容器内) → localhost:10000
+├── Open WebUI → localhost:8111
+├── Caddy (容器内) → localhost:80/443
+└── 其他服务 → localhost:XXXX
 ```
 
 ---
 
-## Project Structure
+## 生成配置详解
+
+### Xray 配置（VLESS + XHTTP）
+
+基于 [Xray 官方文档](https://xtls.github.io/)，生成的配置采用 VLESS + XHTTP 协议组合：
+
+```json
+{
+  "inbounds": [{
+    "protocol": "vless",
+    "settings": {
+      "clients": [{"id": "uuid", "flow": ""}],
+      "decryption": "none"
+    },
+    "streamSettings": {
+      "network": "xhttp",
+      "xhttpSettings": {
+        "path": "/a7kRmQ2xJ9vN4pL",  // 随机生成，增强隐蔽性
+        "mode": "packet-up"           // Packet-Up 模式优化数据包
+      }
+    }
+  }],
+  "outbounds": [{
+    "protocol": "freedom",
+    "tag": "direct"
+  }]
+}
+```
+
+**协议选择说明：**
+- **VLESS** - Xray 推荐的轻量级协议，低开销高性能
+- **XHTTP** - 新一代伪装协议，基于 HTTP 伪装
+- **packet-up 模式** - 数据包优化模式，提高兼容性
+
+### Caddy 配置（反向代理）
+
+```caddyfile
+proxy.example.com {
+    # XHTTP 反向代理到 Xray
+    @xhttp path /a7kRmQ2xJ9vN4pL*
+    reverse_proxy @xhttp 127.0.0.1:10000 {
+        flush_interval -1
+        header_up X-Forwarded-For {remote_host}
+    }
+    
+    # 伪装默认响应
+    respond "Welcome to proxy.example.com" 200
+}
+}
+```
+
+### 订阅配置（包含 SNI）
+
+```
+vless://uuid@proxy.example.com:443?type=xhttp&security=tls&path=%2Fxray&sni=google.com#proxy.example.com
+```
+
+---
+
+## 配置管理
+
+### 配置存储
+
+- **Xray 配置**: `/etc/xray/config.json` 或 `/usr/local/etc/xray/config.json`
+- **Caddy 配置**: `/etc/caddy/Caddyfile` 或配置片段方式
+- **订阅数据**: 内存存储（需要持久化时写入数据库）
+
+### 不会覆盖现有配置！
+
+本工具采用 **配置片段 (snippet)** 方式部署，**不会覆盖**您手动添加的 Caddy 配置。
+
+**文件结构：**
+```
+/etc/caddy/
+├── Caddyfile              # 您的主配置（不会被覆盖）
+└── conf.d/
+    └── xray-auto.caddy    # 自动生成的 Xray 配置
+```
+
+---
+
+## 项目结构
 
 ```
 xray-mcp-server/
-├── main.py                # FastAPI application
-├── models.py              # Pydantic schemas
-├── config_generator.py    # Xray/Caddy config generator
-├── installer.py           # Auto-installer
-├── subscription.py        # Subscription link generator
-├── requirements.txt       # Dependencies
-├── Dockerfile             # Docker image
-└── docker-compose.yaml    # Docker Compose
+├── main.py                # FastAPI REST 接口
+├── server.py              # MCP 工具服务器
+├── models.py              # Pydantic 数据模型
+├── config_generator.py    # Xray/Caddy 配置生成器
+├── installer.py           # 自动安装程序
+├── subscription.py        # 订阅链接生成器
+├── auth.py                # 认证模块
+├── requirements.txt       # 依赖列表
+├── start.sh               # 启动脚本
+├── Dockerfile             # 容器镜像
+└── docker-compose.allinone.yaml  # 完整容器编排
 ```
 
 ---
 
-## Support
+## 支持
 
-- Xray Protocol: **VLESS + XHTTP (packet-up)**
-- Client Compatibility: v2rayN, v2rayNG, Shadowrocket
-- Platform Integration: Open WebUI, Dify, custom clients
+- **Xray 协议**: VLESS + XHTTP (packet-up)
+- **客户端兼容**: v2rayN, v2rayNG, Shadowrocket, Clash 等
+- **集成平台**: Open WebUI, Dify, 自定义 MCP 客户端
 
 ---
 
 ## License
 
 MIT
+

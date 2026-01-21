@@ -56,16 +56,18 @@ def install_dependencies() -> dict:
 @mcp.tool()
 def generate_configs(
     domains: list[str],
-    xray_path: str = "/xray",
-    xray_port: int = 10000
+    xray_port: int = 10000,
+    xray_path: Optional[str] = None,
+    cdn_host: Optional[str] = None
 ) -> dict:
     """
     Generate Xray and Caddy configurations.
     
     Args:
         domains: List of domain names (e.g., ["proxy1.example.com", "proxy2.example.com"])
-        xray_path: URL path for Xray XHTTP endpoint (default: "/xray")
         xray_port: Local port for Xray to listen on (default: 10000)
+        xray_path: URL path for Xray XHTTP endpoint. If not specified, auto-generates random path
+        cdn_host: CDN reverse proxy address for CNAME configuration
     
     Returns:
         Generated configurations and client UUID.
@@ -78,20 +80,24 @@ def generate_configs(
     _current_config = ConfigGenerator(
         domains=domains,
         xray_port=xray_port,
-        xray_path=xray_path
+        xray_path=xray_path,
+        cdn_host=cdn_host
     )
     
-    # Update subscription service
+    # Update subscription service - CDN host for subscription output, domain for SNI
     subscription_service.update_config(
         uuid=_current_config.client_uuid,
         domains=domains,
-        path=xray_path
+        path=_current_config.xray_path,
+        cdn_host=cdn_host
     )
     
     return {
         "success": True,
         "uuid": _current_config.client_uuid,
         "domains": domains,
+        "xray_path": _current_config.xray_path,
+        "cdn_host": cdn_host,
         "xray_config": _current_config.xray_config.to_dict(),
         "caddyfile": _current_config.generate_caddyfile()
     }
