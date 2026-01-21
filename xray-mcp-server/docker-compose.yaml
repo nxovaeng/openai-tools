@@ -1,17 +1,51 @@
 version: '3.8'
 
 services:
+  # Option 1: API-only mode (just generate configs, don't deploy)
   xray-api:
     build: .
     container_name: xray-deployment-api
     ports:
       - "8000:8000"
     volumes:
-      # Mount config directories for deployment
-      - /usr/local/etc/xray:/usr/local/etc/xray
-      - /etc/caddy:/etc/caddy
-    # Privileged mode for systemctl access (optional)
-    privileged: true
+      - ./configs:/app/generated_configs # Save generated configs here
+      - ./.env:/app/.env # API key
     restart: unless-stopped
     environment:
       - TZ=Asia/Shanghai
+      - DEPLOYMENT_MODE=config_only # Only generate, don't deploy
+    networks:
+      - xray-net
+  # Option 2: Full stack (API + Xray + Caddy in Docker)
+  # Uncomment below if you want everything in Docker
+
+  # xray:
+  #   image: teddysun/xray:latest
+  #   container_name: xray-server
+  #   volumes:
+  #     - ./configs/xray:/etc/xray
+  #   restart: unless-stopped
+  #   networks:
+  #     - xray-net
+
+  # caddy:
+  #   image: caddy:2-alpine
+  #   container_name: caddy-server
+  #   ports:
+  #     - "443:443"
+  #     - "80:80"
+  #   volumes:
+  #     - ./configs/caddy/Caddyfile:/etc/caddy/Caddyfile
+  #     - caddy_data:/data
+  #     - caddy_config:/config
+  #   restart: unless-stopped
+  #   networks:
+  #     - xray-net
+
+networks:
+  xray-net:
+    driver: bridge
+
+volumes:
+  caddy_data:
+  caddy_config:

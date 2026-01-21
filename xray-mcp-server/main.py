@@ -85,7 +85,9 @@ async def check_environment():
     response_model=InstallResponse,
     summary="Install dependencies"
 )
-async def install_dependencies(api_key: str = Depends(verify_api_key)):
+async def install_dependencies(
+    api_key: str = Depends(verify_api_key) if os.getenv("REQUIRE_AUTH", "true").lower() == "true" else None
+):
     """
     Install missing Caddy and Xray components.
     
@@ -139,8 +141,72 @@ async def deploy(
         port=443
     )
     
-    # Try to deploy (may fail if not root)
+    # Try to deploy (may fail if not root or in Docker)
     deployment_status = None
+    
+    # Check deployment mode (for Docker containers)
+    import os
+    from pathlib import Path
+    deployment_mode = os.getenv("DEPLOYMENT_MODE", "full")
+    
+    if deployment_mode == "config_only":
+        # Docker mode: only generate configs, don't deploy
+        config_dir = Path("/app/generated_configs")
+        config_dir.mkdir(parents=True, exist_ok=True)
+        
+        (config_dir / "xray-config.json").write_text(_current_config.generate_xray_json())
+        (config_dir / "Caddyfile").write_text(_current_config.generate_caddyfile())
+        
+        deployment_status = {
+            "mode": "config_only",
+            "note": "Configs generated in /app/generated_configs. Deploy manually or use host-mode.",
+            "xray_config": str(config_dir / "xray-config.json"),
+            "caddyfile": str(config_dir / "Caddyfile")
+        }
+    elif deployment_mode == "container":
+        # All-in-one container mode: deploy and restart via supervisord
+        import subprocess
+        
+        xray_path = Path("/etc/xray/config.json")
+        caddy_path = Path("/etc/caddy/Caddyfile")
+        
+        xray_path.parent.mkdir(parents=True, exist_ok=True)
+        caddy_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Save configs
+        xray_path.write_text(_current_config.generate_xray_json())
+        caddy_path.write_text(_current_config.generate_caddyfile())
+        
+        # Restart services via supervisorctl
+        xray_restart = subprocess.run(
+            ["supervisorctl", "restart", "xray"],
+            capture_output=True,
+            text=True
+        )
+        caddy_restart = subprocess.run(
+            ["supervisorctl", "restart", "caddy"],
+            capture_output=True,
+            text=True
+        )
+        
+        deployment_status = {
+            "mode": "container",
+            "xray": {
+                "config_saved": str(xray_path),
+                "restart_success": xray_restart.returncode == 0,
+                "message": xray_restart.stdout if xray_restart.returncode == 0 else xray_restart.stderr
+            },
+            "caddy": {
+                "config_saved": str(caddy_path),
+                "restart_success": caddy_restart.returncode == 0,
+                "message": caddy_restart.stdout if caddy_restart.returncode == 0 else caddy_restart.stderr
+            },
+            "note": "Services managed by supervisord in container"
+        }
+    else:
+        # Host mode: actually deploy to system
+        pass
+    
     try:
         import subprocess
         from pathlib import Path

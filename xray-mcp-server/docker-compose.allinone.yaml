@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  xray-allinone:
+    build:
+      context: .
+      dockerfile: Dockerfile.allinone
+    container_name: xray-allinone
+    ports:
+      - "8000:8000" # API
+      - "443:443" # HTTPS
+      - "80:80" # HTTP
+    volumes:
+      - ./.env:/app/.env # API key
+      - xray_data:/etc/xray # Xray configs (persistent)
+      - caddy_data:/data # Caddy data
+      - caddy_config:/config # Caddy config
+    restart: unless-stopped
+    environment:
+      - TZ=Asia/Shanghai
+      - DEPLOYMENT_MODE=container
+    networks:
+      - xray-net
+
+networks:
+  xray-net:
+    driver: bridge
+
+volumes:
+  xray_data:
+  caddy_data:
+  caddy_config:

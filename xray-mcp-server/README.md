@@ -27,22 +27,89 @@ echo "API_KEY=your-secret-key-here" > .env
 
 > ⚠️ **安全提示**: 请妥善保管 API Key，不要泄露！
 
-### Option 1: Direct Run
+**快速启动（推荐）：**
+```bash
+./start.sh  # 自动创建 venv 并启动服务
+```
+
+### Option 1: Virtual Environment (推荐)
+
+**适用于 Debian/Ubuntu 等启用了 PEP 668 保护的系统**
 
 ```bash
 cd xray-mcp-server
-pip3 install -r requirements.txt
+
+# 创建虚拟环境
+python3 -m venv venv
+
+# 激活虚拟环境
+source venv/bin/activate
+
+# 安装依赖
+pip install -r requirements.txt
+
+# 运行服务器
 uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
-### Option 2: Docker
+**后续启动：**
+```bash
+cd xray-mcp-server
+source venv/bin/activate
+uvicorn main:app --host 0.0.0.0 --port 8000
+```
+
+### Option 2: System-wide (需要 root)
+
+```bash
+cd xray-mcp-server
+sudo pip3 install -r requirements.txt --break-system-packages
+uvicorn main:app --host 0.0.0.0 --port 8000
+```
+
+### Option 3: Docker All-in-One (推荐容器化)
+
+**完整的容器化方案**：API + Xray + Caddy 都在容器中，自动部署和重启。
+
+```bash
+cd xray-mcp-server
+docker compose -f docker-compose.allinone.yaml up -d
+```
+
+**功能：**
+- ✅ 完全自动化部署
+- ✅ API 可以自动重启 Xray/Caddy
+- ✅ supervisord 管理进程
+- ✅ 配置持久化
+
+详细文档：[docker/README.md](file:///home/yimeng/tools/xray-mcp-server/docker/README.md)
+
+### Option 4: Docker (仅配置) (仅生成配置)
+
+**重要说明**: Docker 模式仅会生成配置文件，不会实际部署  Xray/Caddy 服务。
 
 ```bash
 cd xray-mcp-server
 docker compose up -d
 ```
 
-### Option 3: Production (systemd)
+**使用流程：**
+1. API 生成配置文件到 `./configs/` 目录
+2. 手动将配置复制到系统目录：
+   ```bash
+   sudo cp configs/xray-config.json /usr/local/etc/xray/config.json
+   sudo cp configs/Caddyfile /etc/caddy/conf.d/xray-auto.caddy
+   sudo systemctl restart xray
+   sudo systemctl reload caddy
+   ```
+
+**为什么不能自动部署？**
+- Docker 容器无法安装宿主机软件
+- 容器内 `systemctl` 无法控制宿主机服务
+
+> 如需完全自动部署，请使用 **Option 1 (虚拟环境)** 或 **Option 4 (systemd)**
+
+### Option 4: Production (systemd + venv)
 
 ```bash
 # Create service file
@@ -55,7 +122,7 @@ After=network.target
 Type=simple
 User=root
 WorkingDirectory=/path/to/xray-mcp-server
-ExecStart=/usr/bin/python3 -m uvicorn main:app --host 0.0.0.0 --port 8000
+ExecStart=/path/to/xray-mcp-server/venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000
 Restart=always
 
 [Install]
