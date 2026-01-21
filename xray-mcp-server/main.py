@@ -147,13 +147,29 @@ async def deploy(
         
         # Save configs
         xray_path = Path("/usr/local/etc/xray/config.json")
-        caddy_path = Path("/etc/caddy/Caddyfile")
+        
+        # Use snippet file to avoid overwriting existing Caddyfile
+        caddy_snippet_dir = Path("/etc/caddy/conf.d")
+        caddy_snippet_path = caddy_snippet_dir / "xray-auto.caddy"
+        caddy_main_path = Path("/etc/caddy/Caddyfile")
         
         xray_path.parent.mkdir(parents=True, exist_ok=True)
-        caddy_path.parent.mkdir(parents=True, exist_ok=True)
+        caddy_snippet_dir.mkdir(parents=True, exist_ok=True)
         
+        # Save Xray config
         xray_path.write_text(_current_config.generate_xray_json())
-        caddy_path.write_text(_current_config.generate_caddyfile())
+        
+        # Save Caddy snippet (won't overwrite main Caddyfile)
+        caddy_snippet_path.write_text(_current_config.generate_caddyfile())
+        
+        # Check if main Caddyfile has import directive
+        import_line = f"import {caddy_snippet_dir}/*.caddy"
+        if caddy_main_path.exists():
+            caddy_content = caddy_main_path.read_text()
+            if import_line not in caddy_content:
+                # Add import directive at the beginning
+                new_content = f"{import_line}\n\n{caddy_content}"
+                caddy_main_path.write_text(new_content)
         
         # Restart services
         xray_restart = subprocess.run(
@@ -173,8 +189,10 @@ async def deploy(
                 "restart_success": xray_restart.returncode == 0
             },
             "caddy": {
-                "config_saved": str(caddy_path),
-                "reload_success": caddy_reload.returncode == 0
+                "snippet_saved": str(caddy_snippet_path),
+                "main_caddyfile": str(caddy_main_path),
+                "reload_success": caddy_reload.returncode == 0,
+                "note": "Xray config saved to snippet file, existing Caddyfile preserved"
             }
         }
     except Exception as e:

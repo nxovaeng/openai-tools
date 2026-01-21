@@ -21,7 +21,7 @@
 
 **手动设置 API Key** (可选):
 ```bash
-cd /home/yimeng/tools/xray-mcp-server
+cd xray-mcp-server
 echo "API_KEY=your-secret-key-here" > .env
 ```
 
@@ -30,7 +30,7 @@ echo "API_KEY=your-secret-key-here" > .env
 ### Option 1: Direct Run
 
 ```bash
-cd /home/yimeng/tools/xray-mcp-server
+cd xray-mcp-server
 pip3 install -r requirements.txt
 uvicorn main:app --host 0.0.0.0 --port 8000
 ```
@@ -38,7 +38,7 @@ uvicorn main:app --host 0.0.0.0 --port 8000
 ### Option 2: Docker
 
 ```bash
-cd /home/yimeng/tools/xray-mcp-server
+cd xray-mcp-server
 docker compose up -d
 ```
 
@@ -54,7 +54,7 @@ After=network.target
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/home/yimeng/tools/xray-mcp-server
+WorkingDirectory=/path/to/xray-mcp-server
 ExecStart=/usr/bin/python3 -m uvicorn main:app --host 0.0.0.0 --port 8000
 Restart=always
 
@@ -91,7 +91,7 @@ sudo systemctl start xray-api
 ### 0. 获取 API Key
 
 ```bash
-cat /home/yimeng/tools/xray-mcp-server/.env
+cat .env
 # API_KEY=iKt-qkjps0oP3-jewhv6V-CQGOx9nhry1ODkjOXii48
 ```
 
@@ -171,6 +171,33 @@ AI:   好的，我来帮你部署...
 
 ---
 
+## Configuration Management
+
+### 不会覆盖现有配置！
+
+本工具采用 **配置片段 (snippet)** 方式部署，**不会覆盖**您手动添加的 Caddy 配置。
+
+**工作原理：**
+
+1. Xray 配置写入：`/etc/caddy/conf.d/xray-auto.caddy`
+2. 主配置文件自动添加 import 指令：`import /etc/caddy/conf.d/*.caddy`
+3. 您的其他配置保持不变
+
+**文件结构：**
+```
+/etc/caddy/
+├── Caddyfile         # 您的主配置（不会被覆盖）
+└── conf.d/
+    └── xray-auto.caddy  # 自动生成的 Xray 配置
+```
+
+**手动管理：**
+- 编辑其他配置：直接修改 `/etc/caddy/Caddyfile`
+- 查看 Xray 配置：`cat /etc/caddy/conf.d/xray-auto.caddy`
+- 删除 Xray 配置：`rm /etc/caddy/conf.d/xray-auto.caddy && systemctl reload caddy`
+
+---
+
 ## Configuration
 
 生成的 Xray 配置示例：
@@ -243,7 +270,7 @@ sudo ufw allow from YOUR_IP to any port 8000
 ## Project Structure
 
 ```
-/home/yimeng/tools/xray-mcp-server/
+xray-mcp-server/
 ├── main.py                # FastAPI application
 ├── models.py              # Pydantic schemas
 ├── config_generator.py    # Xray/Caddy config generator
