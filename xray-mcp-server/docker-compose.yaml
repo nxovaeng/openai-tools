@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  xray-api:
+    build: .
+    container_name: xray-deployment-api
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount config directories for deployment
+      - /usr/local/etc/xray:/usr/local/etc/xray
+      - /etc/caddy:/etc/caddy
+    # Privileged mode for systemctl access (optional)
+    privileged: true
+    restart: unless-stopped
+    environment:
+      - TZ=Asia/Shanghai
