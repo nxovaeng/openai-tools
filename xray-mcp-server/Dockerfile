@@ -3,6 +3,8 @@ FROM python:3.11-slim
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     curl \
+    wget \
+    unzip \
     supervisor \
     debian-keyring \
     debian-archive-keyring \
@@ -17,8 +19,24 @@ RUN curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --de
     apt-get install -y caddy && \
     rm -rf /var/lib/apt/lists/*
 
-# Install Xray
-RUN curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh | bash -s -- install
+# Install Xray from GitHub releases (avoid systemd issues in container)
+RUN mkdir -p /usr/local/bin && \
+    XRAY_VERSION=$(curl -s https://api.github.com/repos/XTLS/Xray-core/releases/latest | grep tag_name | cut -d'"' -f4) && \
+        ARCH=$(dpkg --print-architecture 2>/dev/null || uname -m) && \
+        case "$ARCH" in \
+            amd64) ASSET="Xray-linux-64.zip" ;; \
+            x86_64) ASSET="Xray-linux-64.zip" ;; \
+            arm64) ASSET="Xray-linux-arm64-v8a.zip" ;; \
+            aarch64) ASSET="Xray-linux-arm64-v8a.zip" ;; \
+            *) ASSET="Xray-linux-64.zip" ;; \
+        esac && \
+        echo "Downloading ${ASSET} for architecture ${ARCH}" && \
+        curl -L "https://github.com/XTLS/Xray-core/releases/download/${XRAY_VERSION}/${ASSET}" -o /tmp/xray.zip && \
+    cd /tmp && unzip -o xray.zip && \
+    mv xray /usr/local/bin/ && \
+    chmod +x /usr/local/bin/xray && \
+    rm -f /tmp/xray.zip /tmp/geo* && \
+    /usr/local/bin/xray -version
 
 # Set working directory
 WORKDIR /app
@@ -49,3 +67,7 @@ ENV DEPLOYMENT_MODE=container \
     XRAY_CONFIG_PATH=/app/data/xray/config.json \
     CADDY_CONFIG_PATH=/app/data/caddy/Caddyfile \
     CADDY_CONF_D_PATH=/app/data/caddy/conf.d/xray-auto.caddy
+
+# Start supervisord as the container's main process
+# Uses the copied supervisord configuration at /etc/supervisor/conf.d/supervisord.conf
+CMD ["supervisord", "-n", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

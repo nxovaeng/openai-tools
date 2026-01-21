@@ -8,6 +8,7 @@ This OpenAPI-compatible server provides REST endpoints for:
 - Getting subscription links
 """
 
+import os
 from fastapi import FastAPI, HTTPException, Body, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -167,7 +168,7 @@ async def deploy(
             "caddy_main": str(config_dir / "Caddyfile"),
             "caddy_xray_auto": str(config_dir / "xray-auto.caddy")
         }
-        }
+
     elif deployment_mode == "container":
         # All-in-one container mode: deploy and restart via supervisord
         import subprocess
