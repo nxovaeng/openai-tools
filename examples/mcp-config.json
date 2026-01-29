@@ -1,0 +1,24 @@
+{
+  "mcpServers": {
+    "nginx-config-manager": {
+      "command": "python",
+      "args": [
+        "/path/to/xray-mcp-server/nginx_mcp_server.py"
+      ],
+      "env": {
+        "PYTHONPATH": "/path/to/xray-mcp-server"
+      },
+      "description": "Nginx 配置管理 - 通过自然语言生成和管理 Nginx 反向代理配置"
+    },
+    "xray-deploy": {
+      "command": "python",
+      "args": [
+        "/path/to/xray-mcp-server/server.py"
+      ],
+      "env": {
+        "PYTHONPATH": "/path/to/xray-mcp-server"
+      },
+      "description": "Xray 部署工具 - 传统 MCP 工具"
+    }
+  }
+}

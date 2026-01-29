@@ -1,0 +1,30 @@
+{
+  "name": "Xray Nginx Manager",
+  "description": "Automated Xray + Nginx deployment and configuration management",
+  "url": "http://localhost:8000",
+  "authentication": {
+    "type": "api_key",
+    "header": "X-API-Key",
+    "value": "your-api-key-here"
+  },
+  "endpoints": {
+    "documentation": "/docs",
+    "openapi_schema": "/openapi.json",
+    "health": "/health"
+  },
+  "features": [
+    "Xray VLESS+XHTTP service deployment",
+    "Nginx reverse proxy configuration",
+    "Multi-domain support",
+    "SSL certificate management",
+    "Service monitoring",
+    "Subscription link generation"
+  ],
+  "tags": [
+    "xray",
+    "nginx",
+    "proxy",
+    "deployment",
+    "configuration"
+  ]
+}
